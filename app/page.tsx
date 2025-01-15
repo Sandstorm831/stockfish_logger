@@ -57,16 +57,18 @@ export default function Home() {
   });
   const [stockfishResponse, setStockfishResponse] = useState<string>("");
   const [value, setValue] = useState("");
-  const [stockfishEngine, setStockfishEngine] = useState<any>()
+  const [stockfishEngine, setStockfishEngine] = useState<any>();
+  const [autoScroll, setAutoScroll] = useState(true);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   let output: string = "";
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    if (autoScroll)
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
     scrollToBottom();
-  }, [stockfishResponse])
+  }, [stockfishResponse]);
 
   useEffect(() => {
     if (!wasmThreadsSupported()) {
@@ -99,14 +101,14 @@ export default function Home() {
               console.log(loading);
             },
           }).then(async (_stockfish) => {
-            setState("Ready");
-            const x = await Stockfish(_stockfish);            // Loaded from the stockfish.js script
+            const x = await Stockfish(_stockfish); // Loaded from the stockfish.js script, it works, but due to
             x.addMessageListener((line: string) => {
               output += line + `\n`;
               setStockfishResponse(output);
             });
-            x.postMessage('isready');
+            x.postMessage("isready");
             setStockfishEngine(x);
+            setState("Ready");
           });
         } catch (err) {
           console.log(
@@ -124,7 +126,7 @@ export default function Home() {
   return (
     <div className="w-screen h-screen flex flex-col">
       <script src="/lib/stockfish.js" />
-      <div className="flex pt-5 pl-5 w-full">
+      <div className="flex pt-5 pl-5 w-11/12">
         <input
           type="string"
           placeholder="Enter UCI Command Here"
@@ -133,10 +135,13 @@ export default function Home() {
           value={value}
         />
         <button
-          className="bg-[#888888] text-white px-2 mr-5"
+          className={`bg-[#888888] text-white px-2 mr-5 ${
+            state === "Ready" ? "cursor-pointer" : "cursor-not-allowed"
+          }`}
           onClick={() => {
             stockfishEngine.postMessage(value);
           }}
+          disabled={state === "Ready" ? false : true}
         >
           SEND
         </button>
@@ -145,25 +150,64 @@ export default function Home() {
           <option value={"stop"} onClick={() => setValue("stop")}>
             stop
           </option>
+          <option value={"isready"} onClick={() => setValue("isready")}>
+            isready
+          </option>
           <option value={"uci"} onClick={() => setValue("uci")}>
             uci
           </option>
           <option value={"go depth 15"} onClick={() => setValue("go depth 15")}>
             go depth 15
           </option>
+          <option value={"eval"} onClick={() => setValue("eval")}>
+            eval
+          </option>
+          <option value={"d"} onClick={() => setValue("d")}>
+            d
+          </option>
+          <option
+            value={"position startpos"}
+            onClick={() => setValue("position startpos")}
+          >
+            position startpos
+          </option>
+          <option
+            value={"setoption name Threads value 4"}
+            onClick={() => setValue("setoption name Threads value 4")}
+          >
+            setoption name Threads value 4
+          </option>
+          <option
+            value={"setoption name Threads value 1"}
+            onClick={() => setValue("setoption name Threads value 1")}
+          >
+            setoption name Threads value 1
+          </option>
           <option value={"go infinite"} onClick={() => setValue("go infinite")}>
             go infinite
           </option>
         </select>
       </div>
-      <div className="pl-5 w-full mt-3">
+      <div className="pl-5 w-full mt-3 font-mono">
         - download : {<>{formatMB(progress.loaded)}</>} /{" "}
         {<>{formatMB(progress.total)}</>}
       </div>
-      <div className="pl-5 w-full mb-3">- stockfish state : {state}</div>
-      <div className="mx-5 mb-3 border flex-1 overflow-scroll whitespace-pre-wrap font-mono" >
+      <div className="pl-5 w-full flex font-mono whitespace-pre">
+        - autoScroll :{" "}
+        <div
+          onClick={() => {
+            setAutoScroll((x) => !x);
+          }}
+        >
+          [{autoScroll ? "x" : " "}]
+        </div>
+      </div>
+      <div className="pl-5 w-full mb-3 font-mono">
+        - stockfish state : {state}
+      </div>
+      <div className="mx-5 mb-3 border flex-1 overflow-scroll whitespace-pre-wrap font-mono">
         {stockfishResponse}
-        <div ref = { messagesEndRef }></div>
+        <div ref={messagesEndRef}></div>
       </div>
     </div>
   );
