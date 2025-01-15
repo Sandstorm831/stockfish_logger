@@ -1,7 +1,6 @@
-'use client'
-import { useEffect, useState } from "react";
-import xhr2 from "xhr2"
-global.XMLHttpRequest = require("xhr2");
+"use client";
+import axios from "axios";
+import { useEffect, useRef, useState } from "react";
 
 const formatMB = (n: number) => {
   return (n ? (n / 1e6).toPrecision(3) : "?") + "MB";
@@ -9,125 +8,163 @@ const formatMB = (n: number) => {
 
 type stockfishState = "Loading" | "Ready" | "Waiting" | "Failed";
 type progressState = {
-  loaded: number,
-  total: number,
-}
-
-const isSupported = () => {
-  if (typeof WebAssembly !== "object") return false;
-  const source = Uint8Array.from([
-    0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 7, 8,
-    1, 4, 116, 101, 115, 116, 0, 0, 10, 15, 1, 13, 0, 65, 0, 253, 17, 65, 0,
-    253, 17, 253, 186, 1, 11,
-  ]);
-  if (
-    typeof WebAssembly.validate !== "function" ||
-    !WebAssembly.validate(source)
-  )
-    return false;
-  if (typeof Atomics !== "object") return false;
-  if (typeof SharedArrayBuffer !== "function") return false;
-  return true;
+  loaded: number;
+  total: number;
 };
 
+function wasmThreadsSupported() {
+  // WebAssembly 1.0
+  const source = Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00);
+  if (
+    typeof WebAssembly !== "object" ||
+    typeof WebAssembly.validate !== "function"
+  )
+    return false;
+  if (!WebAssembly.validate(source)) return false;
+
+  // SharedArrayBuffer
+  if (typeof SharedArrayBuffer !== "function") return false;
+
+  // Atomics
+  if (typeof Atomics !== "object") return false;
+
+  // Shared memory
+  const mem = new WebAssembly.Memory({ shared: true, initial: 8, maximum: 16 });
+  if (!(mem.buffer instanceof SharedArrayBuffer)) return false;
+
+  // Structured cloning
+  try {
+    window.postMessage(mem, "*");
+  } catch (e) {
+    return false;
+  }
+
+  // Growable shared memory (optional)
+  try {
+    mem.grow(8);
+  } catch (e) {
+    return false;
+  }
+
+  return true;
+}
+
 export default function Home() {
-  const [state, setState] = useState<stockfishState>('Waiting')
-  const [progress, setProgress] = useState<progressState>({loaded: 0, total: 0});
+  const [state, setState] = useState<stockfishState>("Waiting");
+  const [progress, setProgress] = useState<progressState>({
+    loaded: 0,
+    total: 0,
+  });
   const [stockfishResponse, setStockfishResponse] = useState<string>("");
-  const [stockfishWorker, setStockfishWorker] = useState<any>();
-  let output : string = ""
-
-  async function initializeStockfishWorker(Print: boolean){
-    if(Print) {
-      console.log(stockfishWorker);
-      stockfishWorker.postMessage('go')
-      return;
-    }
-    const x = await Stockfish(xhr.response)  // loaded with the script
-    console.log(typeof x);
-    setStockfishWorker(x);
-    x.addMessageListener((line: string) => {
-      output += line + `\n`;
-      setStockfishResponse(output);
-    })
-    x.postMessage('setoption name threads value 1');
-    // x.postMessage('go infinite');
-    // x.postMessage('uci');
-    // x.postMessage('setoption name threads value 2');
-    setTimeout(async () => {
-      await x.postMessage('go infinite');
-    }, 5000);
-    setTimeout(() => {
-      x.postMessage('uci');
-    }, 5000);
-    setTimeout(() => {
-      x.postMessage('stop');
-    }, 5000);
-  }
-
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', '/lib/stockfish.wasm', true);
-  xhr.setRequestHeader('Accept', '*/*');
-  xhr.setRequestHeader('Cross-Origin-Embedder-Policy', 'require-corp')
-  xhr.responseType = 'arraybuffer';
-  xhr.onload = async (doneEvent) => {
-    setState('Ready')
-    console.log(`module loaded: ${doneEvent.loaded} bytes transferred`);
-    initializeStockfishWorker(false);
-  }
-  xhr.onerror = (errorEvent) => {
-    setState('Failed');
-    console.log(`Some Error occured while laoding modules: ${errorEvent.loaded} bytes transferred`)
-  }
-  xhr.onprogress = (ProgressEvent) => {
-    setState('Loading');
-    let loaded = ProgressEvent.loaded;
-    let total = ProgressEvent.total || 7031229;
-    setProgress({loaded: loaded, total: total});
-    // console.log(`loaded : ${formatMB(loaded)} / ${formatMB(total)}`)
-  }
-
   const [value, setValue] = useState("");
-  useEffect(()=>{
-    const script = document.createElement("script");
-    script.src = "/lib/stockfish.js";
-    script.async = true;
-    script.type = 'text/javascript'
-    script.crossOrigin = 'anonymous'
-    document.body.appendChild(script);
-    script.onload = () => {
-      // console.log(script.text)
-      xhr.send();
-    }
-    return() => {
-      console.log("I am removing the script")
-      document.body.removeChild(script);
-    }
-
-  }, [])
+  const [stockfishEngine, setStockfishEngine] = useState<any>()
+  const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  let output: string = "";
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   useEffect(() => {
-    console.log(`stockfish worker is changed : ${stockfishWorker}`);
-  }, [stockfishWorker])
+    scrollToBottom();
+  }, [stockfishResponse])
+
+  useEffect(() => {
+    if (!wasmThreadsSupported()) {
+      alert(
+        "Web assembly threads are not supported in this browser, please update or switch the browser"
+      );
+      return;
+    } else {
+      const script = document.createElement("script");
+      script.src = "/lib/stockfish.js";
+      script.async = true;
+      script.type = "text/javascript";
+      script.crossOrigin = "anonymous";
+      document.body.appendChild(script);
+      script.onload = () => {
+        try {
+          axios({
+            url: "/lib/stockfish.wasm",
+            method: "GET",
+            headers: {
+              Accept: "*/*",
+              "Cross-Origin-Embedder-Policy": "require-corp",
+            },
+            responseType: "arraybuffer",
+            onDownloadProgress: (progressEvent) => {
+              setState("Loading");
+              const loading = progressEvent.loaded;
+              const total = progressEvent.total || 27444194;
+              setProgress({ loaded: loading, total: total });
+              console.log(loading);
+            },
+          }).then(async (_stockfish) => {
+            setState("Ready");
+            const x = await Stockfish(_stockfish);            // Loaded from the stockfish.js script
+            x.addMessageListener((line: string) => {
+              output += line + `\n`;
+              setStockfishResponse(output);
+            });
+            x.postMessage('isready');
+            setStockfishEngine(x);
+          });
+        } catch (err) {
+          console.log(
+            `Some error occured while fetching web assembly module: ${err}`
+          );
+        }
+      };
+      return () => {
+        console.log("I am removing the script");
+        document.body.removeChild(script);
+      };
+    }
+  }, []);
+
   return (
     <div className="w-screen h-screen flex flex-col">
       <script src="/lib/stockfish.js" />
       <div className="flex pt-5 pl-5 w-full">
-        <input type="string" placeholder="Enter UCI Command Here" className="w-5/6 border px-2" onChange={(e) => setValue(e.target.value)} value={value} />
-        <button className="bg-[#888888] text-white px-2 mr-5" onClick={() => {initializeStockfishWorker(true)}}>SEND</button>
+        <input
+          type="string"
+          placeholder="Enter UCI Command Here"
+          className="w-5/6 border px-2"
+          onChange={(e) => setValue(e.target.value)}
+          value={value}
+        />
+        <button
+          className="bg-[#888888] text-white px-2 mr-5"
+          onClick={() => {
+            stockfishEngine.postMessage(value);
+          }}
+        >
+          SEND
+        </button>
         <select className="px-3">
-          <option >-- EXAMPLE --</option>
-          <option value={"stop"} onClick={() => setValue("stop")}>stop</option>
-          <option value={"uci"} onClick={() => setValue("uci")}>uci</option>
-          <option value={"go depth 15"} onClick={() => setValue("go depth 15")}>go depth 15</option>
-          <option value={"go infinite"} onClick={() => setValue("go infinite")}>go infinite</option>
+          <option>-- EXAMPLE --</option>
+          <option value={"stop"} onClick={() => setValue("stop")}>
+            stop
+          </option>
+          <option value={"uci"} onClick={() => setValue("uci")}>
+            uci
+          </option>
+          <option value={"go depth 15"} onClick={() => setValue("go depth 15")}>
+            go depth 15
+          </option>
+          <option value={"go infinite"} onClick={() => setValue("go infinite")}>
+            go infinite
+          </option>
         </select>
       </div>
-        <div className="pl-5 w-full mt-3">- download : {<>{formatMB(progress.loaded)}</>} / {<>{formatMB(progress.total)}</>}</div>
-        <div className="pl-5 w-full mb-3">- stockfish state : {state}</div>
-        <span className="mx-5 mb-3 border flex-1 overflow-scroll whitespace-pre-wrap">
-          {stockfishResponse}
-        </span>
+      <div className="pl-5 w-full mt-3">
+        - download : {<>{formatMB(progress.loaded)}</>} /{" "}
+        {<>{formatMB(progress.total)}</>}
+      </div>
+      <div className="pl-5 w-full mb-3">- stockfish state : {state}</div>
+      <div className="mx-5 mb-3 border flex-1 overflow-scroll whitespace-pre-wrap font-mono" >
+        {stockfishResponse}
+        <div ref = { messagesEndRef }></div>
+      </div>
     </div>
   );
 }
