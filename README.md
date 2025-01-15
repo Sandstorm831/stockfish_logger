@@ -1,5 +1,11 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stockfish Terminal
+So this project is a Next.js clone of a demo project prepared for WebAssembly port of [Stockfish](https://github.com/official-stockfish/Stockfish) with NNUE support. You can find the original project [here](https://github.com/hi-ogawa/stockfish-nnue-wasm-demo/).
 
+###### An important note
+
+In this project, in `app/page.tsx` file, from line `104 - 111`, you can see a constant variable `x` is declared first for holding the `object Arraybuffer` output from the Stockfish web assembly, instead of putting it directly in the already declared variable `stockfishEngine`, also stockfishEngine is a state variable, and not a normal variable, which is not normal as it won't be rendered anyway. First we ***have*** to use state variables or `useRef` value that are not affected by rerendereing, and we also ***have*** to use a `const x` for the wasm object as `setState()` hooks are asynchronous in nature, so we can't use the assigned variables instantly after assigning, doing which, will inevitably throw an error, so we first use a normal variable for it, and at last capture in our state variable. 
+
+---
 ## Getting Started
 
 First, run the development server:
