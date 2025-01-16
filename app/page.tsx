@@ -100,7 +100,6 @@ export default function Home() {
               const loading = progressEvent.loaded;
               const total = progressEvent.total || 27444194;
               setProgress({ loaded: loading, total: total });
-              console.log(loading);
             },
           }).then(async (_stockfish) => {
             // @ts-expect-error Loaded from the stockfish.js script, it works but doesn't get detected
@@ -127,8 +126,8 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="w-screen h-screen flex flex-col">
-      <div className="flex pt-5 pl-5 w-11/12">
+    <div className="w-screen h-screen flex flex-col bg-[#F7E7CE]">
+      <div className="flex pt-5 pl-5 w-11/12 ">
         <input
           type="string"
           placeholder="Enter UCI Command Here"
@@ -149,7 +148,7 @@ export default function Home() {
         >
           SEND
         </button>
-        <select className="px-3">
+        <select className="px-3 bg-white">
           <option>-- EXAMPLE --</option>
           <option value={"stop"} onClick={() => setValue("stop")}>
             stop
@@ -209,7 +208,7 @@ export default function Home() {
       <div className="pl-5 w-full mb-3 font-mono">
         - stockfish state : {state}
       </div>
-      <div className="mx-5 mb-3 border flex-1 overflow-scroll whitespace-pre-wrap font-mono">
+      <div className="mx-5 mb-3 border flex-1 overflow-scroll whitespace-pre-wrap font-mono bg-white rounded-lg p-2">
         {stockfishResponse}
         <div ref={messagesEndRef}></div>
       </div>
