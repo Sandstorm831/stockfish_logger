@@ -1,6 +1,9 @@
 # Stockfish Terminal
 So this project is a Next.js clone of a demo project prepared for WebAssembly port of [Stockfish](https://github.com/official-stockfish/Stockfish) with NNUE support. You can find the original project [here](https://github.com/hi-ogawa/stockfish-nnue-wasm-demo/).
 
+[![LiveDemo](/public/images/LiveDemo.png)](https://stockfish-terminal.vercel.app/)
+
+---
 ![Image1](./public/images/Post_64.png)
 ![Image2](./public/images/Post_65.png)
 ### Setting up the project
@@ -113,7 +116,7 @@ function wasmThreadsSupported() {
 
 ###### *Important note*
 
-In the `app/page.tsx` file from `lines 104 to 111`, a constant `x` is used to temporarily hold the ArrayBuffer output from the Stockfish WebAssembly. Instead of directly assigning this to `stockfishEngine`, which is a state variable, because
+In the `app/page.tsx` file from [`lines 106 to 113`](https://github.com/Sandstorm831/stockfish_logger/blob/main/app/page.tsx#L106-L113), a constant `x` is used to temporarily hold the ArrayBuffer output from the Stockfish WebAssembly. Instead of directly assigning this to `stockfishEngine`, which is a state variable, because
 
 - State variables or `useRef` must be used to maintain the reference to Stockfish across re-renders since normal variables do not persist
 
