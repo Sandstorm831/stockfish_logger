@@ -36,6 +36,7 @@ function wasmThreadsSupported() {
   try {
     window.postMessage(mem, "*");
   } catch (e) {
+    console.log(`Browser Error ${e}`);
     return false;
   }
 
@@ -43,6 +44,7 @@ function wasmThreadsSupported() {
   try {
     mem.grow(8);
   } catch (e) {
+    console.log(`Browser Error ${e}`);
     return false;
   }
 
@@ -56,8 +58,8 @@ export default function Home() {
     total: 0,
   });
   const [stockfishResponse, setStockfishResponse] = useState<string>("");
-  const [value, setValue] = useState("");
-  const [stockfishEngine, setStockfishEngine] = useState<any>();
+  const [value, setValue] = useState<string>("");
+  const [stockfishEngine, setStockfishEngine] = useState<object>();
   const [autoScroll, setAutoScroll] = useState(true);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   let output: string = "";
@@ -101,7 +103,8 @@ export default function Home() {
               console.log(loading);
             },
           }).then(async (_stockfish) => {
-            const x = await Stockfish(_stockfish); // Loaded from the stockfish.js script, it works, but due to
+            // @ts-expect-error Loaded from the stockfish.js script, it works but doesn't get detected
+            const x = await Stockfish(_stockfish); // Loaded from the stockfish.js script, it works but doesn't get detected
             x.addMessageListener((line: string) => {
               output += line + `\n`;
               setStockfishResponse(output);
@@ -125,7 +128,6 @@ export default function Home() {
 
   return (
     <div className="w-screen h-screen flex flex-col">
-      <script src="/lib/stockfish.js" />
       <div className="flex pt-5 pl-5 w-11/12">
         <input
           type="string"
@@ -139,6 +141,8 @@ export default function Home() {
             state === "Ready" ? "cursor-pointer" : "cursor-not-allowed"
           }`}
           onClick={() => {
+            if(!stockfishEngine) return;
+            // @ts-expect-error will contain a postMessage and stockfishEngine is vast enough to not to define it's type
             stockfishEngine.postMessage(value);
           }}
           disabled={state === "Ready" ? false : true}
