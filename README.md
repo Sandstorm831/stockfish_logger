@@ -27,9 +27,11 @@ stockfish_logger
  ┃   ┣ favicon.ico
  ┃   ┣ globals.css
  ┃   ┣ layout.tsx
- ┃   ┗ page.tsx                                 # Implementation of the root page and initialization of the engine
+ ┃   ┗ page.tsx                                 # Implementation of the root page and 
+ ┃                                                initialization of the engine
  ┣ public
- ┃   ┣ lib                                      # folder containing the stockfish WebAssembly, glue code and the Web-Workers script
+ ┃   ┣ lib                                      # folder containing the stockfish WebAssembly,
+ ┃   ┃ ┃                                          glue code and the Web-Workers script
  ┃   ┃ ┣ AUTHORS
  ┃   ┃ ┣ Copying.txt
  ┃   ┃ ┣ package.json
@@ -47,7 +49,8 @@ stockfish_logger
  ┣ README.md
  ┣ eslint.config.mjs
  ┣ next-env.d.ts
- ┣ next.config.ts                               # Essential headers allowance for working with Web-Workers
+ ┣ next.config.ts                               # Essential headers allowance for working
+ ┃                                                with Web-Workers
  ┣ package-lock.json
  ┣ package.json
  ┣ postcss.config.mjs
