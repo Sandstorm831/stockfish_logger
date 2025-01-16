@@ -1,42 +1,118 @@
 # Stockfish Terminal
 So this project is a Next.js clone of a demo project prepared for WebAssembly port of [Stockfish](https://github.com/official-stockfish/Stockfish) with NNUE support. You can find the original project [here](https://github.com/hi-ogawa/stockfish-nnue-wasm-demo/).
 
-###### An important note
+### Setting up the project
+Run the following bash commands in the choice of your directory
+```
+// clone the repository
+git clone https://github.com/Sandstorm831/stockfish_logger.git
 
-In this project, in `app/page.tsx` file, from line `104 - 111`, you can see a constant variable `x` is declared first for holding the `object Arraybuffer` output from the Stockfish web assembly, instead of putting it directly in the already declared variable `stockfishEngine`, also stockfishEngine is a state variable, and not a normal variable, which is not normal as it won't be rendered anyway. First we ***have*** to use state variables or `useRef` value that are not affected by rerendereing, and we also ***have*** to use a `const x` for the wasm object as `setState()` hooks are asynchronous in nature, so we can't use the assigned variables instantly after assigning, doing which, will inevitably throw an error, so we first use a normal variable for it, and at last capture in our state variable. 
+// enter the project
+cd stockfish_logger
 
----
-## Getting Started
+// install the packages
+npm install
 
-First, run the development server:
-
-```bash
+// run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Project structure
+```
+stockfish_logger
+ ┣ .next
+ ┣ app
+ ┃   ┣ favicon.ico
+ ┃   ┣ globals.css
+ ┃   ┣ layout.tsx
+ ┃   ┗ page.tsx                                 # Implementation of the root page and initialization of the engine
+ ┣ public
+ ┃   ┣ lib                                      # folder containing the stockfish WebAssembly, glue code and the Web-Workers script
+ ┃   ┃ ┣ AUTHORS
+ ┃   ┃ ┣ Copying.txt
+ ┃   ┃ ┣ package.json
+ ┃   ┃ ┣ stockfish-no-embedded-nnue.wasm
+ ┃   ┃ ┣ stockfish.js                           # Glue code for interacting with .WASM file
+ ┃   ┃ ┣ stockfish.wasm                         # Stockfish WebAssembly
+ ┃   ┃ ┣ stockfish.worker.js                    # Web-Workers script
+ ┃   ┃ ┗ uci.js
+ ┃   ┣ file.svg
+ ┃   ┣ globe.svg
+ ┃   ┣ next.svg
+ ┃   ┣ vercel.svg
+ ┃   ┗ window.svg
+ ┣ .gitignore
+ ┣ README.md
+ ┣ eslint.config.mjs
+ ┣ next-env.d.ts
+ ┣ next.config.ts                               # Essential headers allowance for working with Web-Workers
+ ┣ package-lock.json
+ ┣ package.json
+ ┣ postcss.config.mjs
+ ┣ tailwind.config.ts
+ ┗ tsconfig.json
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Header allowances
+The engine will run in browsers with proper CORS headers applied. The following HTTP headers are required on top level response
+```
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Opener-Policy: same-origin
+```
+and following on included files
+```
+Cross-Origin-Embedder-Policy: require-corp
+```
+If top level headers are not configured properly, the `wasmThreadsSupported()` function as defined below will return `false`. If headers on included files are not configured correctly, something like `pthread sent an error! undefined:undefined: undefined` maybe logged to the console. You can read more about these headers [here](https://web.dev/articles/cross-origin-isolation-guide)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### WebAssembly Threads Support
+```
+function wasmThreadsSupported() {
+  // WebAssembly 1.0
+  const source = Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00);
+  if (
+    typeof WebAssembly !== "object" ||
+    typeof WebAssembly.validate !== "function"
+  )
+    return false;
+  if (!WebAssembly.validate(source)) return false;
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+  // SharedArrayBuffer
+  if (typeof SharedArrayBuffer !== "function") return false;
 
-## Learn More
+  // Atomics
+  if (typeof Atomics !== "object") return false;
 
-To learn more about Next.js, take a look at the following resources:
+  // Shared memory
+  const mem = new WebAssembly.Memory({ shared: true, initial: 8, maximum: 16 });
+  if (!(mem.buffer instanceof SharedArrayBuffer)) return false;
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+  // Structured cloning
+  try {
+    // You have to make sure nobody cares about these messages!
+    window.postMessage(mem, "*");
+  } catch (e) {
+    return false;
+  }
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+  // Growable shared memory (optional)
+  try {
+    mem.grow(8);
+  } catch (e) {
+    return false;
+  }
 
-## Deploy on Vercel
+  return true;
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+###### *Important note*
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+In the `app/page.tsx` file from `lines 104 to 111`, a constant `x` is used to temporarily hold the ArrayBuffer output from the Stockfish WebAssembly. Instead of directly assigning this to `stockfishEngine`, which is a state variable, because
+
+- State variables or `useRef` must be used to maintain the reference to Stockfish across re-renders since normal variables do not persist
+
+- Using a constant `x` for the WebAssembly object is necessary because `setState` hooks are asynchronous. Directly using the variable immediately after setting it would cause errors due to the asynchronous nature of state updates. Thus, we temporarily store the result in `x` before updating the state variable.
+
+### License
+[Stockfish team](https://github.com/official-stockfish/Stockfish) released the engine under GPL3 license
