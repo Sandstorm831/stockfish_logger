@@ -1,6 +1,8 @@
 # Stockfish Terminal
 So this project is a Next.js clone of a demo project prepared for WebAssembly port of [Stockfish](https://github.com/official-stockfish/Stockfish) with NNUE support. You can find the original project [here](https://github.com/hi-ogawa/stockfish-nnue-wasm-demo/).
 
+![Image1](./public/images/Post_64.png)
+![Image2](./public/images/Post_65.png)
 ### Setting up the project
 Run the following bash commands in the choice of your directory
 ```
